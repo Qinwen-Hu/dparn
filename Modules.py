@@ -9,6 +9,8 @@ Modules
 import torch
 from torch import nn
 import numpy as np
+import math
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_tensor_type(torch.FloatTensor)
 
@@ -161,6 +163,77 @@ class Imag_Decoder(nn.Module):
         outp = self.inv_flc(x_5)
         return outp
 
+class AttentionMaskV2(nn.Module):
+    
+    def __init__(self, causal):
+        super(AttentionMaskV2, self).__init__()
+        self.causal = causal
+        
+    def lower_triangular_mask(self, shape):
+        '''
+        
+
+        Parameters
+        ----------
+        shape : a tuple of ints
+
+        Returns
+        -------
+        a square Boolean tensor with the lower triangle being False
+
+        '''
+        row_index = torch.cumsum(torch.ones(size=shape), dim=-2)
+        col_index = torch.cumsum(torch.ones(size=shape), dim=-1)
+        return torch.lt(row_index, col_index)  # lower triangle:True, upper triangle:False
+    
+    def merge_masks(self, x, y):
+        
+        if x is None: return y
+        if y is None: return x
+        return torch.logical_and(x, y)
+        
+        
+    def forward(self, inp):
+        #input (bs, L, ...)
+        max_seq_len = inp.shape[1]
+        if self.causal ==True:
+            causal_mask = self.lower_triangular_mask([max_seq_len, max_seq_len])      #(L, l)
+            return causal_mask
+        else:
+            return torch.zeros(size=(max_seq_len, max_seq_len), dtype=torch.float32)
+        
+class MHAblockV2(nn.Module):
+    
+    def __init__(self, d_model, d_ff, n_heads):
+        
+        super(MHAblockV2, self).__init__()
+        self.d_model = d_model
+        self.d_ff = d_ff
+        self.n_heads = n_heads
+        
+        self.MHA = nn.MultiheadAttention(embed_dim=self.d_model, num_heads=self.n_heads, bias=False)
+        self.norm_1 = nn.LayerNorm([self.d_model], eps=1e-6)
+        
+        self.fc_1 = nn.Conv1d(self.d_model, self.d_ff, 1)
+        self.act = nn.ReLU()
+        self.fc_2 = nn.Conv1d(self.d_ff, self.d_model, 1)
+        self.norm_2 = nn.LayerNorm([self.d_model], eps=1e-6)
+        
+        
+    def forward(self, x, att_mask):
+        
+        # x input: (bs, L, d_model)
+        x = x.permute(1,0,2).contiguous() #(L, bs, d_model)
+        layer_1,_ = self.MHA(x, x, x, attn_mask=att_mask, need_weights=False) #(L, bs, d_model)
+        layer_1 = torch.add(x, layer_1).permute(1,0,2).contiguous() #(L, bs, d_model) ->  (bs, L, d_model)
+        layer_1 = self.norm_1(layer_1) #(bs, L, d_model)
+        
+        layer_2 = self.fc_1(layer_1.permute(0,2,1).contiguous()) #(bs, d_ff, L) 
+        layer_2 = self.act(layer_2) #(bs, d_ff, L) 
+        layer_2 = self.fc_2(layer_2).permute(0,2,1).contiguous() #(bs, d_ff, L)  -> (bs, d_model, L) -> (bs, L, d_model)
+        layer_2 = torch.add(layer_1, layer_2)
+        layer_2 = self.norm_2(layer_2)
+        return layer_2
     
 class PositionalEncoding(nn.Module):
     """This class implements the absolute sinusoidal positional encoding function.
@@ -455,3 +528,12 @@ class DPModel(nn.Module):
         enh_stft = torch.cat([enh_real, enh_imag], 1)#(Bs, 2, T, F)
         
         return enh_stft   
+    
+
+#%%
+if __name__ == '__main__':
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = DPModel(model_type='DPARN', device=device)
+    x = torch.randn(3, 601, 2, 2)
+    y = model(x)
+    print(y.shape)

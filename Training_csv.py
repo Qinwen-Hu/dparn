@@ -49,6 +49,7 @@ def main(args):
     valid_clean_data = pd.DataFrame(valid_clean_dict);valid_clean_data.to_csv(csv_dir + '/valid_clean_data.csv')
     train_noise_data = pd.DataFrame(train_noise_dict);train_noise_data.to_csv(csv_dir + '/train_noise_dict.csv')
     valid_noise_data = pd.DataFrame(valid_noise_dict);valid_noise_data.to_csv(csv_dir + '/valid_noise_dict.csv')
+    
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--clean_dataset_dir", required=True, 
