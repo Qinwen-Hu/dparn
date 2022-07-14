@@ -44,7 +44,7 @@ def infer(args):
             noisy_stft = torch.stft(noisy_s,1200,600,win_length=1200,window=WINDOW,center=True)
 
             enh_stft = model(noisy_stft)
-            enh_s = iSTFT_module_1_7(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy.shape[-1])(enh_stft)
+            enh_s = iSTFT_module_1_7(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy_s.shape[-1])(enh_stft)
             enh_s = enh_s[0,:].cpu().detach().numpy()
 
             enh_s = librosa.resample(enh_s, 48000, 16000)
