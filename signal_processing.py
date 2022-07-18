@@ -103,8 +103,10 @@ class iSTFT_module_1_7(nn.Module):
         else:
             self.padding_num = 0
             
-        if not window:
+        if window == None:
             self.window = torch.sqrt(torch.hann_window(self.win_length)+1e-8).to(device)
+        else:
+            self.window = window
         
     def forward(self, x):
         '''
