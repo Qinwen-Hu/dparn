@@ -18,7 +18,7 @@ from Dataloader import Dataset, collate_fn
 from Modules import DPModel
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_tensor_type(torch.FloatTensor)
-from signal_processing import iSTFT_module_1_7
+from signal_processing import iSTFT_module
 WINDOW = torch.sqrt(torch.hann_window(1200,device=device) + 1e-8)
 
 #------------------------warm up strategy------------------------
@@ -111,7 +111,7 @@ def train(end_epoch = 100):
 
             noisy_stft = torch.stft(noisy,1200,600,win_length=1200,window=WINDOW,center=True)
             enh_stft = model(noisy_stft)
-            enh_s = iSTFT_module_1_7(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy.shape[-1])(enh_stft)
+            enh_s = iSTFT_module(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy.shape[-1])(enh_stft)
 
             stft_loss, snr_loss = Loss(enh_s, clean) 
             stft_loss.backward()
@@ -135,7 +135,7 @@ def train(end_epoch = 100):
 
                 noisy_stft = torch.stft(noisy,1200,600,win_length=1200,window=WINDOW,center=True)
                 enh_stft = model(noisy_stft)
-                enh_s = iSTFT_module_1_7(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy.shape[-1])(enh_stft)
+                enh_s = iSTFT_module(n_fft=1200, hop_length=600, win_length=1200,window=WINDOW,center = True,length = noisy.shape[-1])(enh_stft)
 
                 stft_loss, snr_loss = Loss(enh_s, clean)
                 valid_loss.append(stft_loss.cpu().detach().numpy())
